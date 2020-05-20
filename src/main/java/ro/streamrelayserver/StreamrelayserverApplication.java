@@ -14,7 +14,7 @@ public class StreamrelayserverApplication {
 		ConfigurableApplicationContext ctx = new SpringApplicationBuilder(StreamrelayserverApplication.class).headless(false).run(args);
 		EventQueue.invokeLater(() -> {
 
-		    Server ex = ctx.getBean(Server.class);
+		    StreamRelayServer ex = ctx.getBean(StreamRelayServer.class);
 		    ex.setVisible(true);
 		});
 		

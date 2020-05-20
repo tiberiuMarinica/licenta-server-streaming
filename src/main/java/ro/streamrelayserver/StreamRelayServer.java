@@ -12,27 +12,35 @@ import java.net.SocketException;
 import java.util.Base64;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
-@Component
-public class Server extends JFrame {
+import com.google.gson.Gson;
 
+@Component
+public class StreamRelayServer extends JFrame {
+
+	private RabbitTemplate rabbitTemplate;
+	
 	private static final long serialVersionUID = 1L;
 
 	private JLabel myLabel;
 	
 	private volatile String sharedImageAsString = "";
 	
-	private AtomicInteger ai = new AtomicInteger(0);
+	private AtomicInteger numberOfClients = new AtomicInteger(0);
+	private AtomicBoolean isStreamOn = new AtomicBoolean(false);
 
-	public Server() throws IOException {
-
+	public StreamRelayServer(RabbitTemplate rabbitTemplate) throws IOException {
+		this.rabbitTemplate = rabbitTemplate;
+		
 		myLabel = new JLabel(
 				new ImageIcon("C:\\Users\\tiber\\Pictures\\RKyaEDwp8J7JKeZWQPuOVWvkUjGQfpCx_cover_580.jpg"));
 
@@ -87,7 +95,6 @@ public class Server extends JFrame {
 				System.out.println("A new client is connected : " + s);
 
 				// obtaining input and out streams
-				// DataInputStream dis = new DataInputStream(s.getInputStream());
 				DataOutputStream dos = new DataOutputStream(s.getOutputStream());
 
 				System.out.println("Assigning new thread for this client");
@@ -106,9 +113,27 @@ public class Server extends JFrame {
 	private void handleRabbitMQMessageCommands() {
 		while(true) {
 			try {
-				System.out.println(ai.get());
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
+				
+				System.out.println("Number of clients: " + numberOfClients.get());
+				
+				if(numberOfClients.get() > 0 && !isStreamOn.get()){
+					String commandJson = new Gson().toJson(new Command("START_LIVE_STREAM"));
+					
+					rabbitTemplate.convertAndSend("comenzi", "comenzi", commandJson);
+					
+					isStreamOn.set(true);
+				}
+				
+				if(numberOfClients.get() == 0 && isStreamOn.get()) {
+					String commandJson = new Gson().toJson(new Command("STOP_LIVE_STREAM"));
+					
+					rabbitTemplate.convertAndSend("comenzi", "comenzi", commandJson);
+					
+					isStreamOn.set(false);
+				}
+				
+				Thread.sleep(2000);
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
@@ -118,19 +143,16 @@ public class Server extends JFrame {
 	
 	private void handleClientRequestFromAndroid(DataOutputStream dos) {
 		System.out.println("Assigned thread " + Thread.currentThread().getName());
-		ai.incrementAndGet();
+		numberOfClients.incrementAndGet();
 		
 		try {
 			while(true) {
 				dos.writeUTF(sharedImageAsString); 
 			}
 		} catch(SocketException se) {
-			
-			ai.decrementAndGet();
-			
-			
+			numberOfClients.decrementAndGet();
+			se.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
 	}
