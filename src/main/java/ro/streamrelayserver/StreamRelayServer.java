@@ -6,6 +6,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.io.UTFDataFormatException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -67,7 +68,7 @@ public class StreamRelayServer extends JFrame {
 
 			es.submit(() -> handleStreamFromRaspberryPi());
 
-			es.submit(() -> handleRabbitMQMessageCommands());
+			es.submit(() -> sendRabbitMQMessageCommands());
 			
 			listenForAndroidClientConnectionAndDispatchToThread(es);
 		} catch (Exception e) {
@@ -110,7 +111,7 @@ public class StreamRelayServer extends JFrame {
 		}
 	}
 
-	private void handleRabbitMQMessageCommands() {
+	private void sendRabbitMQMessageCommands() {
 		while(true) {
 			try {
 				
@@ -147,12 +148,20 @@ public class StreamRelayServer extends JFrame {
 		
 		try {
 			while(true) {
-				dos.writeUTF(sharedImageAsString); 
+				try{
+					dos.writeUTF(sharedImageAsString); 
+				}catch(UTFDataFormatException exe) {
+					exe.printStackTrace();
+				}
+				Thread.sleep(100);
 			}
 		} catch(SocketException se) {
 			numberOfClients.decrementAndGet();
 			se.printStackTrace();
 		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} 
 	}
